@@ -9,8 +9,7 @@ LEASE_PRODUCTION_URL = URL_BASE + 'specificLeaseQueryAction.do'
 
 def production_from_lease(lease, district, well_type):
     query_result = rrc_production_query(lease, district, well_type)
-
-    return query_result
+    return parse_production_csv(query_result)
 
 def lease_from_API(api):
     if (len(api) not in (10, 12, 14)):
@@ -95,7 +94,7 @@ def rrc_production_query(lease, district, well_type):
         'actionManager.actionRcrd[0].returnIndexHndlr.inputValue':'0',
         'actionManager.currentIndexHndlr.inputValue':'0',
         'actionManager.recordCountHndlr.inputValue':'1',
-        'methodToCall':'search',
+        'methodToCall':'generateSpecificLeaseCSVReport',
         'searchArgs.activeTabsFlagwordHndlr.inputValue':'0',
         'searchArgs.leaseNumberArg' : lease,
         'searchArgs.districtCodeArg' : district,
@@ -123,3 +122,6 @@ def rrc_production_query(lease, district, well_type):
             raise RuntimeError('HTTP request failed.')
         data = response.read()
         return data.decode()
+
+def parse_production_csv(csv):
+    production = []
