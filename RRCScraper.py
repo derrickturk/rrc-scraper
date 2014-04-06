@@ -1,9 +1,16 @@
 import urllib.request
 import urllib.parse
+import datetime
 import re
 
 URL_BASE = 'http://webapps2.rrc.state.tx.us/EWA/'
 WELLBORE_SEARCH_URL = URL_BASE + 'wellboreQueryAction.do'
+LEASE_PRODUCTION_URL = URL_BASE + 'specificLeaseQueryAction.do'
+
+def production_from_lease(lease, district, well_type):
+    query_result = rrc_production_query(lease, district, well_type)
+
+    return query_result
 
 def lease_from_API(api):
     if (len(api) not in (10, 12, 14)):
@@ -70,9 +77,49 @@ def extract_well_type(lease_query_result):
         extract_well_type.well_type_rgx = re.compile(
                 r'Well Type:\s+<[^>]+>\s+(\w+)', re.IGNORECASE)
 
-    with open('detail.html', 'w') as f:
-        f.write(lease_detail)
     match = extract_well_type.well_type_rgx.search(lease_detail)
     if not match:
         raise RuntimeError('Unable to find well type!')
     return match.group(1)
+
+def rrc_production_query(lease, district, well_type):
+    request_params = {
+        'actionManager.actionRcrd[0].actionDisplayNmHndlr.inputValue':'Search Criteria',
+        'actionManager.actionRcrd[0].actionHndlr.inputValue':'/specificLeaseQueryAction.do',
+        'actionManager.actionRcrd[0].actionMethodHndlr.inputValue':'unspecified',
+        'actionManager.actionRcrd[0].actionParameterHndlr.inputValue':'methodToCall',
+        'actionManager.actionRcrd[0].actionParametersHndlr.inputValue':'',
+        'actionManager.actionRcrd[0].contextPathHndlr.inputValue':'/EWA',
+        'actionManager.actionRcrd[0].hostHndlr.inputValue':'webapps2.rrc.state.tx.us:80',
+        'actionManager.actionRcrd[0].pagerParameterKeyHndlr.inputValue':'',
+        'actionManager.actionRcrd[0].returnIndexHndlr.inputValue':'0',
+        'actionManager.currentIndexHndlr.inputValue':'0',
+        'actionManager.recordCountHndlr.inputValue':'1',
+        'methodToCall':'search',
+        'searchArgs.activeTabsFlagwordHndlr.inputValue':'0',
+        'searchArgs.leaseNumberArg' : lease,
+        'searchArgs.districtCodeArg' : district,
+        'searchArgs.oilOrGasArg' : 'O' if well_type == 'Oil' else 'G',
+        'searchArgs.startMonthArg':'01',
+        'searchArgs.startYearArg':'1993',
+        'searchArgs.endMonthArg':'12',
+        'searchArgs.endYearArg' : datetime.date.today().year,
+        'searchArgs.orderByHndlr.inputValue':'',
+        'searchArgs.searchType':'specificLease',
+        'searchType':'specificLease',
+        'submit':'Submit',
+        'viewType':'init'
+    }
+
+    request = urllib.request.Request(
+            LEASE_PRODUCTION_URL, 
+            urllib.parse.urlencode(request_params).encode('utf-8'),
+            { 'Content-Type' :
+                'application/x-www-form-urlencoded;charset=utf-8' },
+            method='POST')
+
+    with urllib.request.urlopen(request) as response:
+        if response.status != 200:
+            raise RuntimeError('HTTP request failed.')
+        data = response.read()
+        return data.decode()
