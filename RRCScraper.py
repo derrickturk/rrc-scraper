@@ -1,7 +1,9 @@
 import urllib.request
 import urllib.parse
+import re
 
 WELLBORE_SEARCH_URL = 'http://webapps2.rrc.state.tx.us/EWA/wellboreQueryAction.do'
+LEASE_DETAIL_URL = 'http://webapps2.rrc.state.tx.us/EWA/leaseDetailAction.do'
 
 def lease_from_API(api):
     if (len(api) not in (10, 12, 14)):
@@ -34,10 +36,20 @@ def rrc_lease_query(api):
         return data.decode()
 
 def extract_lease_no(lease_query_result):
-    pass
+    if 'rgx' not in extract_lease_no.__dict__:
+        extract_lease_no.rgx = re.compile(r'leaseno=(\d+)', re.IGNORECASE)
+    match = extract_lease_no.rgx.search(lease_query_result)
+    if not match:
+        raise RuntimeError('Unable to find lease number!')
+    return match.group(1)
 
 def extract_district(lease_query_result):
-    pass
+    if 'rgx' not in extract_district.__dict__:
+        extract_district.rgx = re.compile(r'district=(\d+)', re.IGNORECASE)
+    match = extract_district.rgx.search(lease_query_result)
+    if not match:
+        raise RuntimeError('Unable to find district!')
+    return match.group(1)
 
 def extract_well_type(lease_query_result):
-    pass
+    return 'Oil'
