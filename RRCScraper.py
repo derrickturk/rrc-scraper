@@ -2,8 +2,8 @@ import urllib.request
 import urllib.parse
 import re
 
-WELLBORE_SEARCH_URL = 'http://webapps2.rrc.state.tx.us/EWA/wellboreQueryAction.do'
-LEASE_DETAIL_URL = 'http://webapps2.rrc.state.tx.us/EWA/leaseDetailAction.do'
+URL_BASE = 'http://webapps2.rrc.state.tx.us/EWA/'
+WELLBORE_SEARCH_URL = URL_BASE + 'wellboreQueryAction.do'
 
 def lease_from_API(api):
     if (len(api) not in (10, 12, 14)):
@@ -52,4 +52,27 @@ def extract_district(lease_query_result):
     return match.group(1)
 
 def extract_well_type(lease_query_result):
-    return 'Oil'
+    if 'detail_link_rgx' not in extract_well_type.__dict__:
+        extract_well_type.detail_link_rgx = re.compile(
+                r'href="(leaseDetailAction.do[^"]+)"', re.IGNORECASE)
+
+    match = extract_well_type.detail_link_rgx.search(lease_query_result)
+    if not match:
+        raise RuntimeError('No detail link found!')
+    detail_url = URL_BASE + match.group(1)
+
+    request = urllib.request.urlopen(detail_url)
+    if (request.status != 200):
+        raise RuntimeError('HTTP request failed.')
+
+    lease_detail = request.read().decode()
+    if 'well_type_rgx' not in extract_well_type.__dict__:
+        extract_well_type.well_type_rgx = re.compile(
+                r'Well Type:\s+<[^>]+>\s+(\w+)', re.IGNORECASE)
+
+    with open('detail.html', 'w') as f:
+        f.write(lease_detail)
+    match = extract_well_type.well_type_rgx.search(lease_detail)
+    if not match:
+        raise RuntimeError('Unable to find well type!')
+    return match.group(1)
