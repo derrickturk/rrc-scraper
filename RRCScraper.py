@@ -2,6 +2,8 @@ import urllib.request
 import urllib.parse
 import datetime
 import re
+import io
+import csv
 
 URL_BASE = 'http://webapps2.rrc.state.tx.us/EWA/'
 WELLBORE_SEARCH_URL = URL_BASE + 'wellboreQueryAction.do'
@@ -123,5 +125,33 @@ def rrc_production_query(lease, district, well_type):
         data = response.read()
         return data.decode()
 
-def parse_production_csv(csv):
-    production = []
+def parse_production_csv(csv_data):
+    csv_stream = io.StringIO(csv_data)
+    csv_reader = csv.reader(csv_stream)
+
+    for i in range(10):
+        next(csv_reader) # skip header
+
+    data = []
+    for l in csv_reader:
+        data.append({
+            'Month' : l[0],
+            'Oil Disposition' : try_parse(l[1], float, 0.0),
+            'Oil Production' : try_parse(l[2], float, 0.0),
+            'Gas Disposition' : try_parse(l[3], float, 0.0),
+            'Gas Production' : try_parse(l[4], float, 0.0),
+            'Operator' : (l[5] if len(l) > 5
+                else (data[-1]['Operator'] if data else '')),
+            'Field' : (l[7] if len(l) > 7
+                else (data[-1]['Field'] if data else ''))
+        })
+
+    del data[-1] # remove totals row
+
+    return data
+
+def try_parse(val, typ, default):
+    try:
+        return typ(val)
+    except ValueError:
+        return default
