@@ -11,7 +11,7 @@ LEASE_PRODUCTION_URL = URL_BASE + 'specificLeaseQueryAction.do'
 
 def production_from_lease(lease, district, well_type):
     query_result = rrc_production_query(lease, district, well_type)
-    return parse_production_csv(query_result)
+    return parse_production_csv(query_result, well_type)
 
 def lease_from_API(api):
     if (len(api) not in (10, 12, 14)):
@@ -125,7 +125,7 @@ def rrc_production_query(lease, district, well_type):
         data = response.read()
         return data.decode()
 
-def parse_production_csv(csv_data):
+def parse_production_csv(csv_data, well_type):
     csv_stream = io.StringIO(csv_data)
     csv_reader = csv.reader(csv_stream)
 
@@ -133,18 +133,42 @@ def parse_production_csv(csv_data):
         next(csv_reader) # skip header
 
     data = []
-    for l in csv_reader:
-        data.append({
-            'Month' : l[0],
-            'Oil Disposition' : try_parse(l[1], float, 0.0),
-            'Oil Production' : try_parse(l[2], float, 0.0),
-            'Gas Disposition' : try_parse(l[3], float, 0.0),
-            'Gas Production' : try_parse(l[4], float, 0.0),
-            'Operator' : (l[5] if len(l) > 5
-                else (data[-1]['Operator'] if data else '')),
-            'Field' : (l[7] if len(l) > 7
-                else (data[-1]['Field'] if data else ''))
-        })
+    if well_type == 'Oil':
+        for l in csv_reader:
+            data.append({
+                'Month' : l[0],
+                'Oil Production' : try_parse(l[1].replace(',', ''),
+                    float, 0.0),
+                'Oil Disposition' : try_parse(l[2].replace(',', ''),
+                    float, 0.0),
+                'Gas Production' : try_parse(l[3].replace(',', ''),
+                    float, 0.0),
+                'Gas Disposition' : try_parse(l[4].replace(',', ''),
+                    float, 0.0),
+                'Operator' : (l[5] if len(l) > 5
+                    else (data[-1]['Operator'] if data else '')),
+                'Field' : (l[7] if len(l) > 7
+                    else (data[-1]['Field'] if data else ''))
+            })
+    elif well_type == 'Gas':
+        for l in csv_reader:
+            data.append({
+                'Month' : l[0],
+                'Gas Production' : try_parse(l[1].replace(',', ''),
+                    float, 0.0),
+                'Gas Disposition' : try_parse(l[2].replace(',', ''),
+                    float, 0.0),
+                'Condensate Production' : try_parse(l[3].replace(',', ''),
+                    float, 0.0),
+                'Condensate Disposition' : try_parse(l[4].replace(',', ''),
+                    float, 0.0),
+                'Operator' : (l[5] if len(l) > 5
+                    else (data[-1]['Operator'] if data else '')),
+                'Field' : (l[7] if len(l) > 7
+                    else (data[-1]['Field'] if data else ''))
+            })
+    else:
+        raise RuntimeError('Invalid well type!')
 
     del data[-1] # remove totals row
 
